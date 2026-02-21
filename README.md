@@ -41,7 +41,7 @@ The primary objective is to significantly reduce computation time
 The method is based on the convolution between the load distribution and
 the corresponding Green's function of the governing differential equation:
 
-    w(x) = ∫ G(x, ξ) q(ξ) dξ
+    v_f(x) = ∫ G(x, ξ) q(ξ) dξ
 
 Where:
 - G(x, ξ) is the fundamental solution
