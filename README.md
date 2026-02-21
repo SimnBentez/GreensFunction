@@ -42,7 +42,7 @@ The method is based on the convolution between the load distribution and
 the corresponding Green's function of the governing differential equation:
 
 $$
-v_f(x) = \int G(x, \xi) \cdot q(\xi) \, d\xi
+v_f(x) = \int G(x, \xi) \cdot q(\xi) \text{d}\xi
 $$
 
 Where:
