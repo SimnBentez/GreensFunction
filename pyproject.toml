@@ -1,11 +1,14 @@
 [build-system]
-requires = ["scikit-build-core", "pybind11"]
-build-backend = "scikit_build_core.build"
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
 
 [project]
-name = "shape_functions"
+name = "BeamSolver"
 version = "0.1.0"
+description = "Cálculo rápido de funciones de forma y Green para vigas"
+dependencies = [
+    "numpy",
+]
 
-[tool.scikit-build]
-wheel.expand-macos-universal-tags = true
-install(TARGETS shape_functions LIBRARY DESTINATION .)
+[tool.setuptools.packages.find]
+where = ["."]
