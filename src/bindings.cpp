@@ -1,22 +1,41 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-#include <cmath>
+
+#include <vector>
 
 #include "solver.h"
 
 namespace py = pybind11;
 
-// evaluar polinomio
+// Evaluación de polinomios mediante Horner
 double eval_poly(const std::vector<double>& c, double x) {
-    double s = 0;
-    for (int k = 0; k < c.size(); ++k)
-        s += c[k] * std::pow(x, k);
-    return s;
+
+    double result = 0.0;
+
+    for (int i = static_cast<int>(c.size()) - 1; i >= 0; --i) {
+        result = result * x + c[i];
+    }
+
+    return result;
 }
 
-py::dict compute_shape_functions(int N, double L,
-                                 std::vector<double> EI,
-                                 std::vector<double> AsG) {
+// Construcción de funciones evaluables desde Python
+py::cpp_function make_eval_function(
+    const std::vector<double>& coeffs
+) {
+    return py::cpp_function(
+        [coeffs](double x) {
+            return eval_poly(coeffs, x);
+        }
+    );
+}
+
+py::dict compute_shape_functions(
+    int N,
+    double L,
+    std::vector<double> EI,
+    std::vector<double> AsG
+) {
 
     Material mat;
     mat.EI = EI;
@@ -31,44 +50,28 @@ py::dict compute_shape_functions(int N, double L,
 
     py::dict result;
 
-    // devolver funciones evaluables
-    result["psi2_v"] = py::cpp_function([psi2](double x){
-        return eval_poly(psi2.v, x);
-    });
+    // Desplazamientos
+    result["psi2_v"] = make_eval_function(psi2.v);
+    result["psi3_v"] = make_eval_function(psi3.v);
+    result["psi5_v"] = make_eval_function(psi5.v);
+    result["psi6_v"] = make_eval_function(psi6.v);
 
-    result["psi3_v"] = py::cpp_function([psi3](double x){
-        return eval_poly(psi3.v, x);
-    });
-
-    result["psi5_v"] = py::cpp_function([psi5](double x){
-        return eval_poly(psi5.v, x);
-    });
-
-    result["psi6_v"] = py::cpp_function([psi6](double x){
-        return eval_poly(psi6.v, x);
-    });
-
-    result["psi2_theta"] = py::cpp_function([psi2](double x){
-        return eval_poly(psi2.theta, x);
-    });
-
-    result["psi3_theta"] = py::cpp_function([psi3](double x){
-        return eval_poly(psi3.theta, x);
-    });
-
-    result["psi5_theta"] = py::cpp_function([psi5](double x){
-        return eval_poly(psi5.theta, x);
-    });
-
-    result["psi6_theta"] = py::cpp_function([psi6](double x){
-        return eval_poly(psi6.theta, x);
-    });
+    // Rotaciones
+    result["psi2_theta"] = make_eval_function(psi2.theta);
+    result["psi3_theta"] = make_eval_function(psi3.theta);
+    result["psi5_theta"] = make_eval_function(psi5.theta);
+    result["psi6_theta"] = make_eval_function(psi6.theta);
 
     return result;
 }
 
-// módulo Python
 PYBIND11_MODULE(shape_functions, m) {
-    m.def("compute_shape_functions", &compute_shape_functions,
-          "Compute FEM shape functions");
+
+    m.doc() = "Shape functions based on recurrence expansions";
+
+    m.def(
+        "compute_shape_functions",
+        &compute_shape_functions,
+        "Compute shape functions"
+    );
 }
