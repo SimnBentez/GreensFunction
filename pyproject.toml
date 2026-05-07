@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "BeamSolver"
+name = "beam_solver"
 version = "0.1.0"
 description = "Cálculo rápido de funciones de forma y Green para vigas"
 dependencies = [

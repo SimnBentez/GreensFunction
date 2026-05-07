@@ -4,80 +4,71 @@ class BeamSolver:
     def __init__(self, L, EI_coeffs, AsG_coeffs, N):
         self.L = L
         self.N = N
-        # Coeficientes de los polinomios (aseguramos longitud N+1)
         self.EI = np.zeros(N + 1)
         self.AsG = np.zeros(N + 1)
         self.EI[:len(EI_coeffs)] = EI_coeffs
         self.AsG[:len(AsG_coeffs)] = AsG_coeffs
 
     def _compute_recurrence(self, vi, ti, FYi, Mi):
-        """Calcula los coeficientes de v y theta mediante recurrencia numérica"""
         c_theta = np.zeros(self.N + 1)
         c_v = np.zeros(self.N + 1)
-
-        c_theta[0] = ti
-        c_theta[1] = -Mi / self.EI[0]
+        c_theta[0], c_theta[1] = ti, -Mi / self.EI[0]
         
         if self.N >= 1:
             c_theta[2] = (-self.EI[1] * c_theta[1] + FYi) / (2 * self.EI[0])
             
         for k in range(2, self.N):
-            sum_val = 0
-            for k1 in range(k):
-                sum_val += (k1 + 1) * c_theta[k1 + 1] * self.EI[k - k1]
+            sum_val = sum((k1 + 1) * c_theta[k1 + 1] * self.EI[k - k1] for k1 in range(k))
             c_theta[k + 1] = -sum_val / ((k + 1) * self.EI[0])
 
-        c_v[0] = vi
-        c_v[1] = c_theta[0] - FYi / self.AsG[0]
+        c_v[0], c_v[1] = vi, c_theta[0] - FYi / self.AsG[0]
 
         for k in range(1, self.N):
-            main_v = c_theta[k] / (k + 1)
-            sub_sum = 0
-            for k1 in range(k):
-                sub_sum += ((k1 + 1) * c_v[k1 + 1] - c_theta[k1]) * self.AsG[k - k1]
-            c_v[k + 1] = main_v - sub_sum / ((k + 1) * self.AsG[0])
+            sub_sum = sum(((k1 + 1) * c_v[k1 + 1] - c_theta[k1]) * self.AsG[k - k1] for k1 in range(k))
+            c_v[k + 1] = (c_theta[k] / (k + 1)) - sub_sum / ((k + 1) * self.AsG[0])
 
         return c_v, c_theta
 
-    def get_shape_functions(self):
-        """Calcula las 4 funciones de forma (psi2, psi3, psi5, psi6)"""
-        # Para resolver FYi y Mi, evaluamos la respuesta a FYi=1 y Mi=1
-        # v(L) = v_hom(L) + FYi*v_f(L) + Mi*v_m(L)
-        
-        # 1. Respuesta a condiciones iniciales nulas pero fuerzas unitarias
-        v_f, t_f = self._compute_recurrence(0, 0, 1, 0) # FYi=1
-        v_m, t_m = self._compute_recurrence(0, 0, 0, 1) # Mi=1
-        
-        # Valores en L (usando Horner para evaluar polinomios)
+    def solve(self):
+        v_f, t_f = self._compute_recurrence(0, 0, 1, 0)
+        v_m, t_m = self._compute_recurrence(0, 0, 0, 1)
         L_pow = self.L ** np.arange(self.N + 1)
-        vf_L, tf_L = np.sum(v_f * L_pow), np.sum(t_f * L_pow)
-        vm_L, tm_L = np.sum(v_m * L_pow), np.sum(t_m * L_pow)
+        A = np.array([[np.sum(v_f * L_pow), np.sum(v_m * L_pow)], 
+                      [np.sum(t_f * L_pow), np.sum(t_m * L_pow)]])
 
-        # Sistema de matrices para resolver FYi y Mi dado vi, ti, vj, tj
-        A = np.array([[vf_L, vm_L], [tf_L, tm_L]])
-
+        cases = {"psi2": (1, 0, 0, 0), "psi3": (0, 1, 0, 0), "psi5": (0, 0, 1, 0), "psi6": (0, 0, 0, 1)}
         results = {}
-        # Casos de carga unitaria para funciones de forma
-        cases = {
-            "psi2": (1, 0, 0, 0), # vi=1
-            "psi3": (0, 1, 0, 0), # ti=1
-            "psi5": (0, 0, 1, 0), # vj=1
-            "psi6": (0, 0, 0, 1)  # tj=1
-        }
-
         for name, (vi, ti, vj, tj) in cases.items():
-            # Respuesta debida solo a vi, ti
             v_init, t_init = self._compute_recurrence(vi, ti, 0, 0)
-            vi_L, ti_L = np.sum(v_init * L_pow), np.sum(t_init * L_pow)
-            
-            # B = [vj - v_init(L), tj - t_init(L)]
-            B = np.array([vj - vi_L, tj - ti_L])
+            B = np.array([vj - np.sum(v_init * L_pow), tj - np.sum(t_init * L_pow)])
             sol = np.linalg.solve(A, B)
-            
-            # Coeficientes finales: base + (FYi_sol * base_FY) + (Mi_sol * base_Mi)
-            final_v = v_init + sol[0] * v_f + sol[1] * v_m
-            final_t = t_init + sol[0] * t_f + sol[1] * t_m
-            results[name + "_v"] = final_v
-            results[name + "_theta"] = final_t
-            
+            results[name + "_v"] = v_init + sol[0] * v_f + sol[1] * v_m
+            results[name + "_theta"] = t_init + sol[0] * t_f + sol[1] * t_m
+            results[name + "_FYi"] = sol[0]
+            results[name + "_Mi"] = sol[1]
         return results
+
+    def get_stiffness_matrix(self, res):
+        # K_ij = Reacción en i debido a desplazamiento unitario en j
+        K = np.zeros((4, 4))
+        # Grados de libertad: 0:v_i, 1:theta_i, 2:v_j, 3:theta_j
+        names = ["psi2", "psi3", "psi5", "psi6"]
+        for j, name in enumerate(names):
+            # Reacciones en i (nodo inicial x=0)
+            K[0, j] = -res[name + "_FYi"]
+            K[1, j] = -res[name + "_Mi"]
+            
+            # Reacciones en j (nodo final x=L)
+            # V(L) = AsG(L) * (v'(L) - theta(L))
+            v_poly = res[name + "_v"]
+            t_poly = res[name + "_theta"]
+            dv_L = np.sum(np.polyder(v_poly[::-1]) * (self.L ** np.arange(self.N)))
+            t_L = np.sum(t_poly * (self.L ** np.arange(self.N + 1)))
+            EI_L = np.sum(self.EI * (self.L ** np.arange(self.N + 1)))
+            AsG_L = np.sum(self.AsG * (self.L ** np.arange(self.N + 1)))
+            
+            K[2, j] = AsG_L * (dv_L - t_L) # Cortante en L
+            # M(L) = EI(L) * theta'(L)
+            dt_L = np.sum(np.polyder(t_poly[::-1]) * (self.L ** np.arange(self.N)))
+            K[3, j] = EI_L * dt_L
+        return K
