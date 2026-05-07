@@ -3,9 +3,10 @@ requires = ["scikit-build-core", "pybind11"]
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "shape-functions"
+name = "shape_functions" # Usa guion bajo para evitar conflictos
 version = "0.1.0"
 
 [tool.scikit-build]
-wheel.expand-macos-universal-tags = true
-install.components = ["python_modules"] # Opcional, dependiendo de tu CMake
+# Esto obliga a que el binario se instale en el root del sitio de paquetes
+install.components = ["python_modules"] 
+logging.level = "INFO"
