@@ -3,10 +3,9 @@ requires = ["scikit-build-core", "pybind11"]
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "shape_functions" # Usa guion bajo para evitar conflictos
+name = "shape_functions"
 version = "0.1.0"
 
 [tool.scikit-build]
-# Esto obliga a que el binario se instale en el root del sitio de paquetes
-install.components = ["python_modules"] 
-logging.level = "INFO"
+wheel.expand-macos-universal-tags = true
+install(TARGETS shape_functions LIBRARY DESTINATION .)
