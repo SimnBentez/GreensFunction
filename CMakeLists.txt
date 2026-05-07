@@ -16,3 +16,5 @@ target_include_directories(shape_functions PRIVATE
     include
     src
 )
+
+install(TARGETS shape_functions DESTINATION .)
